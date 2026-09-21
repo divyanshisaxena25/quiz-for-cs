@@ -55,4 +55,42 @@ export type AppView =
   | 'quiz'
   | 'result'
   | 'detailed_analysis'
-  | 'study_analysis';
+  | 'study_analysis'
+  | 'developer_portal';
+
+export interface VisitorQuizSummary {
+  id: string;
+  subjectName: string;
+  score: number;
+  totalQuestions: number;
+  percentage: number;
+  completedAt: string;
+}
+
+export interface VisitorRecord {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl: string;
+  provider: 'google' | 'linkedin';
+  firstLoginAt: string;
+  lastActiveAt: string;
+  loginCount: number;
+  quizzesAttempted: number;
+  averageScore?: number;
+  highestScore?: number;
+  lastQuizSubject?: string;
+  lastQuizScore?: number;
+  deviceInfo?: string;
+  recentQuizzes?: VisitorQuizSummary[];
+}
+
+export interface VisitorMetrics {
+  totalVisitors: number;
+  totalLogins: number;
+  googleCount: number;
+  linkedinCount: number;
+  totalQuizzesTaken: number;
+  averageScore: number;
+  activeToday: number;
+}

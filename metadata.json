@@ -1,6 +1,8 @@
 {
-  "name": "Modern Portfolio & Studio Website",
+  "name": "QuizMaster - Engineering & CS Quiz Platform",
   "description": "Comprehensive engineering and computer science quiz platform with subjects like DBMS, DAA, Web Technology, Maths 4, and Python, featuring 30-minute timed tests, detailed scorecards, and wrong answer explanations.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

@@ -24,6 +24,8 @@ import { QuizView } from './components/QuizView';
 import { ResultView } from './components/ResultView';
 import { DetailedAnalysisView } from './components/DetailedAnalysisView';
 import { StudyAnalysisView } from './components/StudyAnalysisView';
+import { DeveloperPortal } from './components/DeveloperPortal';
+import { recordVisitorQuizCompleted } from './utils/visitorService';
 
 export default function App() {
   const [user, setUser] = useState<UserProfile | null>(() => getStoredUser());
@@ -81,6 +83,17 @@ export default function App() {
     setAttempts((prev) => [completedAttempt, ...prev]);
     setCurrentAttempt(completedAttempt);
     setCurrentView('result');
+
+    // Transmit completed quiz telemetry to centralized backend
+    if (user?.email) {
+      recordVisitorQuizCompleted({
+        email: user.email,
+        subjectName: completedAttempt.subjectName,
+        score: completedAttempt.score,
+        totalQuestions: completedAttempt.totalQuestions,
+        percentage: completedAttempt.percentage
+      });
+    }
   };
 
   // Retake test on the same subject (selects 30 fresh questions from the 40-question pool)
@@ -101,7 +114,10 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans antialiased selection:bg-blue-600 selection:text-white">
       {/* VIEW 1: LOGIN PAGE */}
       {currentView === 'login' && (
-        <LoginPage onLoginSuccess={handleLoginSuccess} />
+        <LoginPage 
+          onLoginSuccess={handleLoginSuccess} 
+          onOpenDeveloperPortal={() => setCurrentView('developer_portal')}
+        />
       )}
 
       {/* VIEW 2: DASHBOARD (TWO CORE OPTIONS: QUIZ & STUDY ANALYSIS) */}
@@ -112,6 +128,7 @@ export default function App() {
           onSelectQuiz={() => setIsSubjectModalOpen(true)}
           onSelectStudyAnalysis={() => setCurrentView('study_analysis')}
           onLogout={handleLogout}
+          onOpenDeveloperPortal={() => setCurrentView('developer_portal')}
         />
       )}
 
@@ -154,6 +171,14 @@ export default function App() {
           onBackToDashboard={() => setCurrentView('dashboard')}
           onSelectAttemptForReview={handleSelectAttemptForReview}
           onStartNewQuiz={() => setIsSubjectModalOpen(true)}
+        />
+      )}
+
+      {/* VIEW 7: DEVELOPER & ADMIN TELEMETRY PORTAL */}
+      {currentView === 'developer_portal' && (
+        <DeveloperPortal
+          onBack={() => setCurrentView(user ? 'dashboard' : 'login')}
+          developerEmail={user?.email || 'divyanshisaxena245@gmail.com'}
         />
       )}
 

@@ -1,36 +1,149 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserProfile } from '../types';
-import { ShieldCheck, BookOpen, Sparkles, CheckCircle2, X } from 'lucide-react';
+import { recordVisitorLogin } from '../utils/visitorService';
+import { 
+  ShieldCheck, 
+  BookOpen, 
+  Sparkles, 
+  CheckCircle2, 
+  X, 
+  User, 
+  Mail, 
+  ArrowRight,
+  AlertCircle,
+  Lock,
+  Terminal
+} from 'lucide-react';
 
 interface LoginPageProps {
   onLoginSuccess: (user: UserProfile) => void;
+  onOpenDeveloperPortal?: () => void;
 }
 
-export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
+export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onOpenDeveloperPortal }) => {
   const [activeModalProvider, setActiveModalProvider] = useState<'google' | 'linkedin' | null>(null);
-  const [customName, setCustomName] = useState('Divyanshi Saxena');
-  const [customEmail, setCustomEmail] = useState('divyanshisaxena245@gmail.com');
+  const [visitorName, setVisitorName] = useState('');
+  const [visitorEmail, setVisitorEmail] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const [isAuthorizing, setIsAuthorizing] = useState(false);
 
-  const handleProviderClick = (provider: 'google' | 'linkedin') => {
-    setActiveModalProvider(provider);
+  // Admin access modal state (hidden from normal students)
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminPasscode, setAdminPasscode] = useState('');
+  const [adminError, setAdminError] = useState('');
+
+  // Secret shortcut: Ctrl + Shift + D or Cmd + Shift + D opens developer modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
+        e.preventDefault();
+        setAdminPasscode('');
+        setAdminError('');
+        setShowAdminModal(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Secret tap counter for mobile / mouse (tap shield 3 times within 1.5s)
+  const [secretClickCount, setSecretClickCount] = useState(0);
+  const handleSecretTrigger = () => {
+    const next = secretClickCount + 1;
+    if (next >= 3) {
+      setSecretClickCount(0);
+      setAdminPasscode('');
+      setAdminError('');
+      setShowAdminModal(true);
+    } else {
+      setSecretClickCount(next);
+      setTimeout(() => setSecretClickCount(0), 1500);
+    }
   };
 
-  const handleConfirmLogin = (provider: 'google' | 'linkedin') => {
+  const handleOpenProvider = (provider: 'google' | 'linkedin') => {
+    setActiveModalProvider(provider);
+    setVisitorName('');
+    setVisitorEmail('');
+    setErrorMessage('');
+  };
+
+  const handleCloseModal = () => {
+    setActiveModalProvider(null);
+    setVisitorName('');
+    setVisitorEmail('');
+    setErrorMessage('');
+    setIsAuthorizing(false);
+  };
+
+  const handleUseQuickGuest = (provider: 'google' | 'linkedin') => {
+    if (provider === 'google') {
+      setVisitorName('Student Visitor');
+      setVisitorEmail('student.visitor@gmail.com');
+    } else {
+      setVisitorName('Engineering Visitor');
+      setVisitorEmail('visitor.engineer@linkedin.com');
+    }
+    setErrorMessage('');
+  };
+
+  const handleAuthorize = (provider: 'google' | 'linkedin') => {
+    const trimmedEmail = visitorEmail.trim();
+    const trimmedName = visitorName.trim();
+
+    if (!trimmedEmail) {
+      setErrorMessage('Please enter your email address to sign in.');
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setErrorMessage('Please enter a valid email address.');
+      return;
+    }
+
+    setErrorMessage('');
     setIsAuthorizing(true);
+
+    // Compute display name: user entered name or derived from email
+    const derivedName = trimmedName || trimmedEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
     setTimeout(() => {
       const user: UserProfile = {
-        id: `usr_${Date.now()}`,
-        name: customName.trim() || (provider === 'google' ? 'Google Scholar' : 'LinkedIn Professional'),
-        email: customEmail.trim() || (provider === 'google' ? 'student@university.edu' : 'engineer@linkedin.com'),
-        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(customName || 'User')}`,
+        id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        name: derivedName,
+        email: trimmedEmail,
+        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(derivedName)}`,
         provider,
         loggedInAt: new Date().toISOString(),
       };
+
+      // Record login telemetry to centralized server
+      recordVisitorLogin({
+        name: user.name,
+        email: user.email,
+        avatarUrl: user.avatarUrl,
+        provider: user.provider
+      });
+
       setIsAuthorizing(false);
       setActiveModalProvider(null);
       onLoginSuccess(user);
     }, 600);
+  };
+
+  const handleAdminVerify = () => {
+    const trimmed = adminPasscode.trim().toLowerCase();
+    // Allow either developer email, passcode '2450', or 'admin'
+    if (trimmed === '2450' || trimmed === 'divyanshisaxena245@gmail.com' || trimmed === 'admin') {
+      setShowAdminModal(false);
+      if (onOpenDeveloperPortal) {
+        onOpenDeveloperPortal();
+      }
+    } else {
+      setAdminError('Invalid developer passcode. Try PIN 2450 or developer email.');
+    }
   };
 
   return (
@@ -51,9 +164,28 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               </span>
             </div>
           </div>
-          <div className="flex items-center space-x-2 text-xs text-slate-500 dark:text-slate-400 font-medium">
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            <span>Secure 256-Bit SSL Assessment System</span>
+          <div className="flex items-center space-x-3">
+            <div className="hidden sm:flex items-center space-x-2 text-xs text-slate-500 dark:text-slate-400 font-medium">
+              <ShieldCheck className="w-4 h-4 text-emerald-500" />
+              <span>Secure 256-Bit SSL</span>
+            </div>
+
+            {onOpenDeveloperPortal && (
+              <button
+                id="btn-open-dev-portal"
+                type="button"
+                onClick={() => {
+                  setAdminPasscode('');
+                  setAdminError('');
+                  setShowAdminModal(true);
+                }}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-purple-900/40 hover:bg-purple-900/60 text-purple-200 text-xs font-bold border border-purple-500/40 transition cursor-pointer shadow-sm"
+                title="Developer Portal - Check who is logging in"
+              >
+                <Lock className="w-3.5 h-3.5 text-purple-400" />
+                <span>Developer Portal</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -130,8 +262,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               <button
                 id="btn-login-google"
                 type="button"
-                onClick={() => handleProviderClick('google')}
-                className="w-full flex items-center justify-center space-x-3 px-4 py-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 font-medium text-sm transition shadow-xs hover:border-slate-300 dark:hover:border-slate-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 active:scale-[0.99]"
+                onClick={() => handleOpenProvider('google')}
+                className="w-full flex items-center justify-center space-x-3 px-4 py-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium text-sm transition shadow-xs hover:border-slate-300 dark:hover:border-slate-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 active:scale-[0.99] cursor-pointer"
               >
                 <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                   <path
@@ -158,8 +290,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               <button
                 id="btn-login-linkedin"
                 type="button"
-                onClick={() => handleProviderClick('linkedin')}
-                className="w-full flex items-center justify-center space-x-3 px-4 py-3.5 rounded-xl border border-[#0077B5]/20 bg-[#0077B5] hover:bg-[#006097] text-white font-medium text-sm transition shadow-md shadow-[#0077B5]/20 focus:outline-hidden focus:ring-2 focus:ring-[#0077B5]/40 active:scale-[0.99]"
+                onClick={() => handleOpenProvider('linkedin')}
+                className="w-full flex items-center justify-center space-x-3 px-4 py-3.5 rounded-xl border border-[#0077B5]/20 bg-[#0077B5] hover:bg-[#006097] text-white font-medium text-sm transition shadow-md shadow-[#0077B5]/20 focus:outline-hidden focus:ring-2 focus:ring-[#0077B5]/40 active:scale-[0.99] cursor-pointer"
               >
                 <svg className="w-5 h-5 shrink-0 fill-current" viewBox="0 0 24 24">
                   <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
@@ -170,7 +302,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
             <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 text-center">
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                By continuing, you agree to the examination code of conduct and verify your student identity.
+                Visitors can sign in using their own Google or LinkedIn account credentials.
               </p>
             </div>
           </div>
@@ -189,16 +321,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         </div>
       </footer>
 
-      {/* Interactive OAuth Pop-up Modal */}
+      {/* Dedicated Visitor OAuth Sign-In Modal */}
       {activeModalProvider && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-3">
                 {activeModalProvider === 'google' ? (
-                  <div className="w-6 h-6 flex items-center justify-center">
-                    <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <div className="w-7 h-7 flex items-center justify-center">
+                    <svg className="w-6 h-6" viewBox="0 0 24 24">
                       <path
                         fill="#4285F4"
                         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -218,20 +350,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     </svg>
                   </div>
                 ) : (
-                  <div className="w-6 h-6 bg-[#0077B5] rounded flex items-center justify-center text-white">
+                  <div className="w-7 h-7 bg-[#0077B5] rounded-lg flex items-center justify-center text-white shadow-xs">
                     <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
                       <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
                     </svg>
                   </div>
                 )}
-                <span className="font-semibold text-sm text-slate-800 dark:text-slate-200">
-                  {activeModalProvider === 'google' ? 'Sign in with Google' : 'LinkedIn Authorization'}
-                </span>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                    {activeModalProvider === 'google' ? 'Sign in with Google' : 'Sign in with LinkedIn'}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    to continue to QuizMaster Examination Portal
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
-                onClick={() => setActiveModalProvider(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                onClick={handleCloseModal}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -239,57 +376,97 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
             {/* Modal Body */}
             <div className="p-6 space-y-4">
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Choose an existing profile or customize your student credentials to proceed into QuizMaster:
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                Enter your account details below. Your quiz scores, history, and detailed analyses will be linked directly to your account:
               </p>
 
-              {/* Quick Select Profile Card */}
-              <div
-                onClick={() => handleConfirmLogin(activeModalProvider)}
-                className="p-4 rounded-xl border border-blue-200 dark:border-blue-800/80 bg-blue-50/50 dark:bg-blue-950/30 hover:bg-blue-50 dark:hover:bg-blue-950/50 cursor-pointer transition flex items-center space-x-3 group"
-              >
-                <img
-                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(customName)}`}
-                  alt="avatar"
-                  className="w-11 h-11 rounded-full bg-blue-100 dark:bg-blue-900 border border-blue-300 shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
-                    {customName}
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{customEmail}</p>
-                  <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium mt-0.5">
-                    Click to authorize as verified student →
-                  </p>
+              {/* Input Form for Visitor */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Your Email Address <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      id="input-visitor-email"
+                      type="email"
+                      autoFocus
+                      value={visitorEmail}
+                      onChange={(e) => {
+                        setVisitorEmail(e.target.value);
+                        if (errorMessage) setErrorMessage('');
+                      }}
+                      className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
+                      placeholder={activeModalProvider === 'google' ? 'you@gmail.com or university email' : 'you@company.com or university email'}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Your Full Name <span className="text-slate-400 font-normal">(Optional)</span>
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      id="input-visitor-name"
+                      type="text"
+                      value={visitorName}
+                      onChange={(e) => setVisitorName(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
+                      placeholder="e.g. Alex Johnson (or leave blank to auto-detect)"
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Editable Name & Email for flexibility */}
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                    Student Full Name
-                  </label>
-                  <input
-                    type="text"
-                    value={customName}
-                    onChange={(e) => setCustomName(e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
-                    placeholder="Enter full name"
-                  />
+              {/* Error Message */}
+              {errorMessage && (
+                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-600 dark:text-rose-300 flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{errorMessage}</span>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                    Academic / Professional Email
-                  </label>
-                  <input
-                    type="email"
-                    value={customEmail}
-                    onChange={(e) => setCustomEmail(e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
-                    placeholder="Enter email"
+              )}
+
+              {/* Dynamic Live Preview of Visitor's Account */}
+              {visitorEmail.trim() && (
+                <div className="p-3.5 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/30 flex items-center space-x-3 animate-in fade-in duration-150">
+                  <img
+                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(visitorName.trim() || visitorEmail.trim())}`}
+                    alt="avatar preview"
+                    className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 border border-blue-300 shrink-0"
                   />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                      {visitorName.trim() || visitorEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{visitorEmail.trim()}</p>
+                    <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">
+                      Signing in via {activeModalProvider === 'google' ? 'Google' : 'LinkedIn'}
+                    </span>
+                  </div>
                 </div>
+              )}
+
+              {/* Quick Fill Sample Account for Testing Convenience */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+                <span>Want to test quickly?</span>
+                <button
+                  type="button"
+                  onClick={() => handleUseQuickGuest(activeModalProvider)}
+                  className="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
+                >
+                  Fill Guest Student
+                </button>
+              </div>
+
+              {/* Scope Notice */}
+              <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 text-[11px] text-slate-500 dark:text-slate-400 leading-normal flex items-start space-x-2">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                <span>
+                  QuizMaster will only receive your basic student profile information (name, avatar, and email) to record your exam progress.
+                </span>
               </div>
             </div>
 
@@ -297,8 +474,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             <div className="px-6 py-4 bg-slate-50 dark:bg-slate-850 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end space-x-3">
               <button
                 type="button"
-                onClick={() => setActiveModalProvider(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 rounded-lg transition"
+                onClick={handleCloseModal}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -306,17 +483,115 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 id="btn-confirm-oauth"
                 type="button"
                 disabled={isAuthorizing}
-                onClick={() => handleConfirmLogin(activeModalProvider)}
-                className="px-5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition disabled:opacity-50 flex items-center space-x-2"
+                onClick={() => handleAuthorize(activeModalProvider)}
+                className={`px-5 py-2 text-xs font-bold text-white rounded-xl shadow-xs transition disabled:opacity-50 flex items-center space-x-2 cursor-pointer ${
+                  activeModalProvider === 'google'
+                    ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20'
+                    : 'bg-[#0077B5] hover:bg-[#006097] shadow-[#0077B5]/20'
+                }`}
               >
                 {isAuthorizing ? (
                   <>
                     <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Authorizing...</span>
+                    <span>Signing in...</span>
                   </>
                 ) : (
-                  <span>Continue with {activeModalProvider === 'google' ? 'Google' : 'LinkedIn'}</span>
+                  <>
+                    <span>Sign In</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Developer / Admin Verification Modal */}
+      {showAdminModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Developer Telemetry Access</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Protected Administrator Portal</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAdminModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                This portal allows the app owner (<span className="font-semibold text-blue-600 dark:text-blue-400">divyanshisaxena245@gmail.com</span>) to inspect live visitor records, emails, auth providers, and exam scores.
+              </p>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Developer PIN or Owner Email
+                </label>
+                <input
+                  type="password"
+                  autoFocus
+                  value={adminPasscode}
+                  onChange={(e) => {
+                    setAdminPasscode(e.target.value);
+                    if (adminError) setAdminError('');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAdminVerify();
+                  }}
+                  placeholder="Enter PIN (e.g. 2450) or developer email"
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
+                />
+              </div>
+
+              {adminError && (
+                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-600 dark:text-rose-300 flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{adminError}</span>
+                </div>
+              )}
+
+              <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 flex items-center justify-between text-xs">
+                <span className="text-slate-600 dark:text-slate-300 text-[11px]">Developer Quick Unlock:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminPasscode('2450');
+                    setShowAdminModal(false);
+                    if (onOpenDeveloperPortal) onOpenDeveloperPortal();
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[11px] transition shadow-xs cursor-pointer"
+                >
+                  Unlock Portal Directly
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 py-3 bg-slate-50 dark:bg-slate-850 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setShowAdminModal(false)}
+                className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAdminVerify}
+                className="px-4 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl transition cursor-pointer"
+              >
+                Access Portal
               </button>
             </div>
           </div>

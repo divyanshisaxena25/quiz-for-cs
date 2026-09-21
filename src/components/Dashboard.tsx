@@ -10,7 +10,9 @@ import {
   TrendingUp, 
   ChevronRight,
   BookMarked,
-  Sparkles
+  Sparkles,
+  Terminal,
+  Activity
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -19,6 +21,7 @@ interface DashboardProps {
   onSelectQuiz: () => void;
   onSelectStudyAnalysis: () => void;
   onLogout: () => void;
+  onOpenDeveloperPortal?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -26,7 +29,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   attempts,
   onSelectQuiz,
   onSelectStudyAnalysis,
-  onLogout
+  onLogout,
+  onOpenDeveloperPortal
 }) => {
   // Aggregate statistics
   const totalTests = attempts.length;
@@ -55,7 +59,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           {/* User profile & logout */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3 sm:space-x-4">
+            {onOpenDeveloperPortal && (
+              <button
+                id="btn-dashboard-dev-portal"
+                type="button"
+                onClick={onOpenDeveloperPortal}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-500/20"
+                title="Developer Portal - Real-Time Visitor Telemetry"
+              >
+                <Activity className="w-3.5 h-3.5" />
+                <span>Developer Portal</span>
+              </button>
+            )}
+
             <div className="flex items-center space-x-3">
               <img
                 src={user.avatarUrl}
@@ -64,9 +81,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
               />
               <div className="hidden sm:block text-left">
                 <p className="text-xs font-bold text-slate-900 dark:text-white leading-none">{user.name}</p>
-                <div className="flex items-center space-x-1.5 mt-1">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[150px] mt-0.5">{user.email}</p>
+                <div className="flex items-center space-x-1.5 mt-0.5">
                   <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400 capitalize">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 capitalize">
                     via {user.provider}
                   </span>
                 </div>
@@ -280,6 +298,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </section>
         )}
       </main>
+
+      {/* Footer with Developer Link */}
+      <footer className="border-t border-slate-200 dark:border-slate-800 py-6 px-6 text-center text-xs text-slate-500 dark:text-slate-400 mt-12 bg-white/50 dark:bg-slate-900/50">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p>© {new Date().getFullYear()} QuizMaster Academic Portal. All rights reserved.</p>
+          <div className="flex items-center space-x-6">
+            {onOpenDeveloperPortal && (
+              <button
+                type="button"
+                onClick={onOpenDeveloperPortal}
+                className="text-purple-600 dark:text-purple-400 hover:underline flex items-center space-x-1.5 cursor-pointer font-medium"
+              >
+                <Terminal className="w-3.5 h-3.5" />
+                <span>Developer Telemetry Logs</span>
+              </button>
+            )}
+            <span>Privacy Policy</span>
+            <span>Academic Integrity</span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

@@ -7,7 +7,13 @@ export function getStoredUser(): UserProfile | null {
   try {
     const raw = localStorage.getItem(USER_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const user = JSON.parse(raw);
+    // Invalidate stale developer account so visiting users always see their own account
+    if (user?.email === 'divyanshisaxena245@gmail.com' || user?.name === 'Divyanshi Saxena') {
+      localStorage.removeItem(USER_KEY);
+      return null;
+    }
+    return user;
   } catch (err) {
     console.error('Failed to load user from storage', err);
     return null;
