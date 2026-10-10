@@ -1,5 +1,5 @@
-import React from 'react';
-import { QuizAttempt } from '../types';
+import React, { useState } from 'react';
+import { QuizAttempt, UserProfile } from '../types';
 import { 
   Trophy, 
   CheckCircle, 
@@ -11,11 +11,18 @@ import {
   BarChart2, 
   LayoutDashboard,
   Sparkles,
-  AlertTriangle
+  AlertTriangle,
+  Award,
+  Download,
+  Eye,
+  ShieldCheck
 } from 'lucide-react';
+import { CertificateModal } from './CertificateModal';
+import { generateDirectCertificatePDF } from '../utils/certificateUtils';
 
 interface ResultViewProps {
   attempt: QuizAttempt;
+  user?: UserProfile;
   onOpenDetailedAnalysis: () => void;
   onRetakeSubjectQuiz: () => void;
   onOpenStudyAnalysis: () => void;
@@ -24,11 +31,14 @@ interface ResultViewProps {
 
 export const ResultView: React.FC<ResultViewProps> = ({
   attempt,
+  user,
   onOpenDetailedAnalysis,
   onRetakeSubjectQuiz,
   onOpenStudyAnalysis,
   onBackToDashboard
 }) => {
+  const [isCertModalOpen, setIsCertModalOpen] = useState(false);
+  const [isDownloadingDirectPdf, setIsDownloadingDirectPdf] = useState(false);
   const attemptedCount = attempt.rightCount + attempt.wrongCount;
 
   // Grade descriptor
@@ -164,9 +174,69 @@ export const ResultView: React.FC<ResultViewProps> = ({
             </div>
           </div>
 
+          {/* DIGITAL CERTIFICATE SECTION */}
+          <div className="pt-2">
+            <div className="p-6 rounded-3xl bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/5 dark:from-amber-950/40 dark:via-yellow-950/30 dark:to-slate-900 border-2 border-amber-300 dark:border-amber-800/80 shadow-md flex flex-col md:flex-row items-center justify-between gap-6 text-left">
+              <div className="flex items-start space-x-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-600 text-white shadow-md flex items-center justify-center shrink-0">
+                  <Award className="w-7 h-7" />
+                </div>
+                <div className="space-y-1">
+                  <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 text-[10px] font-black uppercase tracking-wider">
+                    <ShieldCheck className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                    <span>Official Credential Conferred</span>
+                  </div>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white">
+                    Digital Certificate of Completion (PDF)
+                  </h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 max-w-xl leading-relaxed">
+                    Congratulations! Your proctored exam in <strong className="text-slate-900 dark:text-white">{attempt.subjectName}</strong> has been audited and approved. Your cryptographically verified certificate is ready to download.
+                  </p>
+                  <p className="text-[11px] font-mono text-amber-700 dark:text-amber-400 font-bold">
+                    Certificate ID: QM-CERT-{new Date(attempt.completedAt).getFullYear()}-{(attempt.id || 'QM').slice(0, 8).toUpperCase()}
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row items-center gap-2.5 shrink-0 w-full md:w-auto">
+                <button
+                  id="btn-preview-cert"
+                  type="button"
+                  onClick={() => setIsCertModalOpen(true)}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 text-xs font-bold transition flex items-center justify-center space-x-2 shadow-xs cursor-pointer"
+                >
+                  <Eye className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Preview &amp; Edit Name</span>
+                </button>
+
+                <button
+                  id="btn-download-cert-pdf-direct"
+                  type="button"
+                  onClick={async () => {
+                    setIsDownloadingDirectPdf(true);
+                    try {
+                      generateDirectCertificatePDF(attempt, user);
+                    } catch (e) {
+                      console.error(e);
+                      setIsCertModalOpen(true);
+                    } finally {
+                      setTimeout(() => setIsDownloadingDirectPdf(false), 1500);
+                    }
+                  }}
+                  disabled={isDownloadingDirectPdf}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-slate-950 font-black text-xs shadow-md shadow-amber-500/25 transition flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-60"
+                >
+                  <Download className="w-4 h-4 text-slate-950" />
+                  <span>{isDownloadingDirectPdf ? 'Downloading PDF...' : 'Download Certificate (PDF)'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* CRITICAL USER REQUIREMENT:
               "and a link pf detailed analysis in the click of detailed analyis the answer of wrong questions with full explanation will show" */}
-          <div className="pt-4">
+          <div className="pt-2">
             <div 
               id="link-detailed-analysis"
               onClick={onOpenDetailedAnalysis}
@@ -228,6 +298,16 @@ export const ResultView: React.FC<ResultViewProps> = ({
           </button>
         </div>
       </main>
+
+      {/* Official Certificate Modal */}
+      {isCertModalOpen && (
+        <CertificateModal
+          isOpen={isCertModalOpen}
+          onClose={() => setIsCertModalOpen(false)}
+          attempt={attempt}
+          user={user || { id: attempt.userId, name: 'Student', email: '', avatarUrl: '', provider: 'google', loggedInAt: attempt.completedAt }}
+        />
+      )}
     </div>
   );
 };

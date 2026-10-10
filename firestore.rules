@@ -1,0 +1,61 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isDeveloper() {
+      return (request.auth != null && request.auth.token.email == 'divyanshisaxena245@gmail.com');
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    // Connection test document
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+
+    // Users collection (stores visitor profile, total logins, quiz count, first/last login dates)
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update: if isValidId(userId);
+      allow delete: if isDeveloper();
+    }
+
+    // Login Activity Log (records each login instance, device info, IP, provider, timestamps)
+    match /login_logs/{logId} {
+      allow read: if true;
+      allow create, update: if isValidId(logId);
+      allow delete: if isDeveloper();
+    }
+
+    // Dispatched Emails Log (records security alert emails sent to user upon login)
+    match /email_logs/{emailId} {
+      allow read: if true;
+      allow create, update: if isValidId(emailId);
+      allow delete: if isDeveloper();
+    }
+
+    // Quiz Attempts collection
+    match /quiz_attempts/{attemptId} {
+      allow read: if true;
+      allow create: if isValidId(attemptId);
+      allow update, delete: if isDeveloper();
+    }
+
+    // Visitors Telemetry collection
+    match /visitors/{visitorId} {
+      allow read: if true;
+      allow create: if isValidId(visitorId);
+      allow update, delete: if isDeveloper();
+    }
+  }
+}

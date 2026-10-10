@@ -30,6 +30,7 @@ export interface UserProfile {
   avatarUrl: string;
   provider: 'google' | 'linkedin';
   loggedInAt: string;
+  isAdmin?: boolean;
 }
 
 export interface QuizAttempt {
@@ -67,6 +68,29 @@ export interface VisitorQuizSummary {
   completedAt: string;
 }
 
+export interface EmailNotificationLog {
+  id: string;
+  recipientEmail: string;
+  recipientName: string;
+  subject: string;
+  sentAt: string;
+  status: 'delivered' | 'simulated' | 'failed';
+  provider: string;
+  deviceInfo?: string;
+  messagePreview?: string;
+}
+
+export interface LoginHistoryEntry {
+  id: string;
+  userId?: string;
+  userName: string;
+  email: string;
+  provider: 'google' | 'linkedin';
+  loginAt: string;
+  deviceInfo?: string;
+  emailSent: boolean;
+}
+
 export interface VisitorRecord {
   id: string;
   name: string;
@@ -83,6 +107,8 @@ export interface VisitorRecord {
   lastQuizScore?: number;
   deviceInfo?: string;
   recentQuizzes?: VisitorQuizSummary[];
+  loginHistory?: LoginHistoryEntry[];
+  emailLogs?: EmailNotificationLog[];
 }
 
 export interface VisitorMetrics {
@@ -93,4 +119,6 @@ export interface VisitorMetrics {
   totalQuizzesTaken: number;
   averageScore: number;
   activeToday: number;
+  totalEmailsSent?: number;
 }
+

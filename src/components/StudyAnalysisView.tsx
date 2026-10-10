@@ -13,11 +13,15 @@ import {
   RotateCcw,
   Sparkles,
   ChevronRight,
-  GraduationCap
+  GraduationCap,
+  Award
 } from 'lucide-react';
+import { UserProfile } from '../types';
+import { CertificateModal } from './CertificateModal';
 
 interface StudyAnalysisViewProps {
   attempts: QuizAttempt[];
+  user?: UserProfile;
   onBackToDashboard: () => void;
   onSelectAttemptForReview: (attempt: QuizAttempt) => void;
   onStartNewQuiz: () => void;
@@ -25,10 +29,12 @@ interface StudyAnalysisViewProps {
 
 export const StudyAnalysisView: React.FC<StudyAnalysisViewProps> = ({
   attempts,
+  user,
   onBackToDashboard,
   onSelectAttemptForReview,
   onStartNewQuiz
 }) => {
+  const [certAttempt, setCertAttempt] = React.useState<QuizAttempt | null>(null);
   const totalTests = attempts.length;
   const totalQuestions = attempts.reduce((acc, curr) => acc + curr.totalQuestions, 0);
   const totalRight = attempts.reduce((acc, curr) => acc + curr.rightCount, 0);
@@ -251,9 +257,24 @@ export const StudyAnalysisView: React.FC<StudyAnalysisViewProps> = ({
                       </span>
                     </div>
 
-                    <div className="flex items-center space-x-1 text-xs font-bold text-blue-600 dark:text-blue-400 group-hover:translate-x-1 transition-transform">
-                      <span>Review Explanations</span>
-                      <ChevronRight className="w-4 h-4" />
+                    <div className="flex items-center space-x-3">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCertAttempt(att);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-[11px] font-bold flex items-center space-x-1 transition cursor-pointer shadow-2xs"
+                        title="Download Digital Certificate PDF"
+                      >
+                        <Award className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        <span>Certificate PDF</span>
+                      </button>
+
+                      <div className="flex items-center space-x-1 text-xs font-bold text-blue-600 dark:text-blue-400 group-hover:translate-x-1 transition-transform">
+                        <span>Review Explanations</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -262,6 +283,16 @@ export const StudyAnalysisView: React.FC<StudyAnalysisViewProps> = ({
           )}
         </section>
       </main>
+
+      {/* Official Digital Certificate Modal */}
+      {certAttempt && (
+        <CertificateModal
+          isOpen={Boolean(certAttempt)}
+          onClose={() => setCertAttempt(null)}
+          attempt={certAttempt}
+          user={user || { id: certAttempt.userId, name: 'Student', email: '', avatarUrl: '', provider: 'google', loggedInAt: certAttempt.completedAt }}
+        />
+      )}
     </div>
   );
 };

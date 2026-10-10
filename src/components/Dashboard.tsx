@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { UserProfile, QuizAttempt } from '../types';
 import { 
   GraduationCap, 
@@ -12,12 +12,15 @@ import {
   BookMarked,
   Sparkles,
   Terminal,
-  Activity
+  Activity,
+  Download
 } from 'lucide-react';
+import { CertificateModal } from './CertificateModal';
 
 interface DashboardProps {
   user: UserProfile;
   attempts: QuizAttempt[];
+  isAdmin?: boolean;
   onSelectQuiz: () => void;
   onSelectStudyAnalysis: () => void;
   onLogout: () => void;
@@ -27,17 +30,27 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({
   user,
   attempts,
+  isAdmin = false,
   onSelectQuiz,
   onSelectStudyAnalysis,
   onLogout,
   onOpenDeveloperPortal
 }) => {
+  const [certAttempt, setCertAttempt] = useState<QuizAttempt | null>(null);
+
   // Aggregate statistics
   const totalTests = attempts.length;
   const totalQuestions = attempts.reduce((acc, curr) => acc + curr.totalQuestions, 0);
   const totalRight = attempts.reduce((acc, curr) => acc + curr.rightCount, 0);
   const overallAccuracy = totalQuestions > 0 ? Math.round((totalRight / totalQuestions) * 100) : 0;
   const bestScore = attempts.length > 0 ? Math.max(...attempts.map(a => a.score)) : 0;
+
+  // Strict check: Developer Portal is visible ONLY to Admin
+  const hasAdminAccess = Boolean(
+    isAdmin || 
+    user.isAdmin || 
+    (user.email && user.email.toLowerCase().trim() === 'divyanshisaxena245@gmail.com')
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col">
@@ -60,16 +73,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           {/* User profile & logout */}
           <div className="flex items-center space-x-3 sm:space-x-4">
-            {onOpenDeveloperPortal && (
+            {/* Developer Portal: ONLY visible to verified Admin */}
+            {hasAdminAccess && onOpenDeveloperPortal && (
               <button
                 id="btn-dashboard-dev-portal"
                 type="button"
                 onClick={onOpenDeveloperPortal}
                 className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-500/20"
-                title="Developer Portal - Real-Time Visitor Telemetry"
+                title="Developer Portal - Real-Time Visitor Telemetry (Admin Only)"
               >
                 <Activity className="w-3.5 h-3.5" />
                 <span>Developer Portal</span>
+                <span className="ml-1 text-[9px] bg-purple-800/80 px-1.5 py-0.5 rounded font-semibold uppercase">Admin</span>
               </button>
             )}
 
@@ -80,7 +95,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 className="w-9 h-9 rounded-full bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700"
               />
               <div className="hidden sm:block text-left">
-                <p className="text-xs font-bold text-slate-900 dark:text-white leading-none">{user.name}</p>
+                <div className="flex items-center space-x-1.5">
+                  <p className="text-xs font-bold text-slate-900 dark:text-white leading-none">{user.name}</p>
+                  {hasAdminAccess && (
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-950/80 dark:text-purple-300 font-bold border border-purple-200 dark:border-purple-800">
+                      Admin
+                    </span>
+                  )}
+                </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[150px] mt-0.5">{user.email}</p>
                 <div className="flex items-center space-x-1.5 mt-0.5">
                   <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -284,13 +306,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       {new Date(attempt.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-3">
                     <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
                       {attempt.score} / {attempt.totalQuestions} ({attempt.percentage}%)
                     </span>
-                    <span className="text-xs text-rose-500 font-medium">
+                    <span className="text-xs text-rose-500 font-medium hidden sm:inline">
                       {attempt.wrongCount} wrong
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => setCertAttempt(attempt)}
+                      className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-[11px] font-bold flex items-center space-x-1 transition cursor-pointer shadow-2xs"
+                      title="Download Digital Certificate PDF"
+                    >
+                      <Award className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                      <span>Certificate PDF</span>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -298,6 +329,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </section>
         )}
       </main>
+
+      {/* Official Certificate Modal */}
+      {certAttempt && (
+        <CertificateModal
+          isOpen={Boolean(certAttempt)}
+          onClose={() => setCertAttempt(null)}
+          attempt={certAttempt}
+          user={user}
+        />
+      )}
 
       {/* Footer with Developer Link */}
       <footer className="border-t border-slate-200 dark:border-slate-800 py-6 px-6 text-center text-xs text-slate-500 dark:text-slate-400 mt-12 bg-white/50 dark:bg-slate-900/50">

@@ -1,0 +1,66 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "developer"] },
+        "createdAt": { "type": "string" },
+        "lastLoginAt": { "type": "string" }
+      },
+      "required": ["uid", "name", "email", "createdAt"]
+    },
+    "QuizAttempt": {
+      "title": "QuizAttempt",
+      "description": "Recorded quiz submission and scores",
+      "type": "object",
+      "properties": {
+        "attemptId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "category": { "type": "string" },
+        "score": { "type": "number" },
+        "totalQuestions": { "type": "number" },
+        "percentage": { "type": "number" },
+        "timeSpentSeconds": { "type": "number" },
+        "completedAt": { "type": "string" }
+      },
+      "required": ["attemptId", "userId", "category", "score", "totalQuestions", "percentage", "completedAt"]
+    },
+    "VisitorRecord": {
+      "title": "VisitorRecord",
+      "description": "Visitor session telemetry log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "email": { "type": "string" },
+        "provider": { "type": "string" },
+        "loginAt": { "type": "string" },
+        "userAgent": { "type": "string" }
+      },
+      "required": ["id", "userName", "email", "provider", "loginAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile documents"
+    },
+    "/quiz_attempts/{attemptId}": {
+      "schema": "QuizAttempt",
+      "description": "Exam quiz attempt submissions"
+    },
+    "/visitors/{visitorId}": {
+      "schema": "VisitorRecord",
+      "description": "Telemetry logs of visitor logins"
+    }
+  }
+}

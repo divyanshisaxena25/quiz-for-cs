@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile } from '../types';
 import { recordVisitorLogin } from '../utils/visitorService';
+import { auth, ensureFirebaseAuth } from '../firebase';
 import { 
   ShieldCheck, 
   BookOpen, 
@@ -61,6 +62,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onOpenDeve
     }
   };
 
+  const handleGoogleSignInClick = () => {
+    handleOpenProvider('google');
+  };
+
   const handleOpenProvider = (provider: 'google' | 'linkedin') => {
     setActiveModalProvider(provider);
     setVisitorName('');
@@ -87,7 +92,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onOpenDeve
     setErrorMessage('');
   };
 
-  const handleAuthorize = (provider: 'google' | 'linkedin') => {
+  const handleAuthorize = async (provider: 'google' | 'linkedin') => {
     const trimmedEmail = visitorEmail.trim();
     const trimmedName = visitorName.trim();
 
@@ -106,43 +111,65 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onOpenDeve
     setErrorMessage('');
     setIsAuthorizing(true);
 
+    try {
+      await ensureFirebaseAuth();
+    } catch (e) {
+      console.debug('Firebase auth initialization note:', e);
+    }
+
     // Compute display name: user entered name or derived from email
     const derivedName = trimmedName || trimmedEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const currentUid = auth.currentUser?.uid || `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-    setTimeout(() => {
-      const user: UserProfile = {
-        id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        name: derivedName,
-        email: trimmedEmail,
-        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(derivedName)}`,
-        provider,
-        loggedInAt: new Date().toISOString(),
-      };
+    const isAdmin = trimmedEmail.toLowerCase() === 'divyanshisaxena245@gmail.com';
+    const user: UserProfile = {
+      id: currentUid,
+      name: derivedName,
+      email: trimmedEmail,
+      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(derivedName)}`,
+      provider,
+      loggedInAt: new Date().toISOString(),
+      isAdmin,
+    };
 
-      // Record login telemetry to centralized server
-      recordVisitorLogin({
+    // Record login telemetry to centralized server & Firestore
+    try {
+      await recordVisitorLogin({
+        userId: user.id,
         name: user.name,
         email: user.email,
         avatarUrl: user.avatarUrl,
         provider: user.provider
       });
+    } catch (err) {
+      console.warn('Visitor record sync notice:', err);
+    }
 
-      setIsAuthorizing(false);
-      setActiveModalProvider(null);
-      onLoginSuccess(user);
-    }, 600);
+    setIsAuthorizing(false);
+    setActiveModalProvider(null);
+    onLoginSuccess(user);
   };
 
   const handleAdminVerify = () => {
     const trimmed = adminPasscode.trim().toLowerCase();
-    // Allow either developer email, passcode '2450', or 'admin'
-    if (trimmed === '2450' || trimmed === 'divyanshisaxena245@gmail.com' || trimmed === 'admin') {
+    // Allow either developer PIN 2450, admin email, or secret admin token
+    if (trimmed === '2450' || trimmed === 'divyanshisaxena245@gmail.com' || trimmed === 'admin2450' || trimmed === 'admin') {
       setShowAdminModal(false);
+      const adminUser: UserProfile = {
+        id: 'admin_divyanshi',
+        name: 'Divyanshi Saxena (Admin)',
+        email: 'divyanshisaxena245@gmail.com',
+        avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=DivyanshiAdmin',
+        provider: 'google',
+        loggedInAt: new Date().toISOString(),
+        isAdmin: true
+      };
+      onLoginSuccess(adminUser);
       if (onOpenDeveloperPortal) {
         onOpenDeveloperPortal();
       }
     } else {
-      setAdminError('Invalid developer passcode. Try PIN 2450 or developer email.');
+      setAdminError('Invalid administrator credentials. Please check your PIN or admin email.');
     }
   };
 
@@ -170,22 +197,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onOpenDeve
               <span>Secure 256-Bit SSL</span>
             </div>
 
-            {onOpenDeveloperPortal && (
-              <button
-                id="btn-open-dev-portal"
-                type="button"
-                onClick={() => {
-                  setAdminPasscode('');
-                  setAdminError('');
-                  setShowAdminModal(true);
-                }}
-                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-purple-900/40 hover:bg-purple-900/60 text-purple-200 text-xs font-bold border border-purple-500/40 transition cursor-pointer shadow-sm"
-                title="Developer Portal - Check who is logging in"
-              >
-                <Lock className="w-3.5 h-3.5 text-purple-400" />
-                <span>Developer Portal</span>
-              </button>
-            )}
           </div>
         </div>
       </header>
@@ -262,7 +273,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onOpenDeve
               <button
                 id="btn-login-google"
                 type="button"
-                onClick={() => handleOpenProvider('google')}
+                onClick={handleGoogleSignInClick}
                 className="w-full flex items-center justify-center space-x-3 px-4 py-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium text-sm transition shadow-xs hover:border-slate-300 dark:hover:border-slate-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 active:scale-[0.99] cursor-pointer"
               >
                 <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
@@ -317,6 +328,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onOpenDeve
             <span>Privacy Policy</span>
             <span>Examination Terms</span>
             <span>Honor Code</span>
+            <button
+              type="button"
+              onClick={() => {
+                setAdminPasscode('');
+                setAdminError('');
+                setShowAdminModal(true);
+              }}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition flex items-center space-x-1 cursor-pointer"
+              title="Admin Portal Login"
+            >
+              <Lock className="w-3 h-3 inline" />
+              <span>Admin Access</span>
+            </button>
           </div>
         </div>
       </footer>
@@ -461,11 +485,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onOpenDeve
                 </button>
               </div>
 
-              {/* Scope Notice */}
-              <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 text-[11px] text-slate-500 dark:text-slate-400 leading-normal flex items-start space-x-2">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+              {/* Scope & Email Alert Notice */}
+              <div className="p-2.5 rounded-lg bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/50 dark:border-indigo-800/40 text-[11px] text-indigo-700 dark:text-indigo-300 leading-normal flex items-start space-x-2">
+                <Mail className="w-3.5 h-3.5 text-indigo-500 shrink-0 mt-0.5" />
                 <span>
-                  QuizMaster will only receive your basic student profile information (name, avatar, and email) to record your exam progress.
+                  <strong>Security Alert:</strong> A login confirmation email with your session details and exam progress will be dispatched to this email address automatically upon signing in.
                 </span>
               </div>
             </div>
@@ -561,21 +585,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onOpenDeve
                   <span>{adminError}</span>
                 </div>
               )}
-
-              <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 flex items-center justify-between text-xs">
-                <span className="text-slate-600 dark:text-slate-300 text-[11px]">Developer Quick Unlock:</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAdminPasscode('2450');
-                    setShowAdminModal(false);
-                    if (onOpenDeveloperPortal) onOpenDeveloperPortal();
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[11px] transition shadow-xs cursor-pointer"
-                >
-                  Unlock Portal Directly
-                </button>
-              </div>
             </div>
 
             <div className="px-6 py-3 bg-slate-50 dark:bg-slate-850 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end space-x-2">
